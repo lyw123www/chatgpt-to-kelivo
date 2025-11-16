@@ -207,68 +207,60 @@
                 console.log(`  HTML 结构预览:`, element.outerHTML.substring(0, 500));
             }
 
-            // 提取内容 - 尝试多种方式
+            // 提取内容 - 优先使用 HTML 转 Markdown 保留格式
             let content = '';
+            let contentElement = null;
             let usedContentSelector = '';
 
             // 方法1: 优先尝试 markdown 容器（最常见）
             const markdownEl = element.querySelector('.markdown, [class*="markdown"]');
-            if (markdownEl && markdownEl.innerText?.trim()) {
-                content = markdownEl.innerText.trim();
+            if (markdownEl) {
+                contentElement = markdownEl;
                 usedContentSelector = '.markdown';
             }
 
             // 方法2: 尝试 prose 容器
-            if (!content) {
+            if (!contentElement) {
                 const proseEl = element.querySelector('[class*="prose"]');
-                if (proseEl && proseEl.innerText?.trim()) {
-                    content = proseEl.innerText.trim();
+                if (proseEl) {
+                    contentElement = proseEl;
                     usedContentSelector = '[class*="prose"]';
                 }
             }
 
             // 方法3: 尝试 whitespace-pre-wrap
-            if (!content) {
+            if (!contentElement) {
                 const preWrapEl = element.querySelector('.whitespace-pre-wrap');
-                if (preWrapEl && preWrapEl.innerText?.trim()) {
-                    content = preWrapEl.innerText.trim();
+                if (preWrapEl) {
+                    contentElement = preWrapEl;
                     usedContentSelector = '.whitespace-pre-wrap';
                 }
             }
 
-            // 方法4: 查找所有可能的文本容器并组合
-            if (!content) {
-                const textContainers = element.querySelectorAll('p, div[class*="text"], article');
-                if (textContainers.length > 0) {
-                    const texts = Array.from(textContainers)
-                        .map(el => el.innerText?.trim())
-                        .filter(text => text && text.length > 2)
-                        // 去重
-                        .filter((text, idx, arr) => arr.indexOf(text) === idx);
-
-                    if (texts.length > 0) {
-                        content = texts.join('\n\n');
-                        usedContentSelector = `multiple containers (${texts.length})`;
-                    }
+            // 方法4: 查找 article 或主要内容容器
+            if (!contentElement) {
+                const articleEl = element.querySelector('article, [class*="message-content"]');
+                if (articleEl) {
+                    contentElement = articleEl;
+                    usedContentSelector = 'article/message-content';
                 }
             }
 
-            // 方法5: 直接获取元素的 innerText
-            if (!content) {
-                const directText = element.innerText?.trim();
-                if (directText) {
-                    content = directText;
-                    usedContentSelector = 'element.innerText';
-                }
+            // 方法5: 使用整个元素
+            if (!contentElement) {
+                contentElement = element;
+                usedContentSelector = 'element itself';
             }
 
-            // 方法6: 最后尝试 textContent
-            if (!content) {
-                const textContent = element.textContent?.trim();
-                if (textContent) {
-                    content = textContent;
-                    usedContentSelector = 'element.textContent';
-                }
+            // 转换 HTML 为 Markdown
+            if (contentElement) {
+                content = htmlToMarkdown(contentElement);
+            }
+
+            // 如果 HTML 转换失败，回退到纯文本
+            if (!content || content.trim().length === 0) {
+                content = contentElement.innerText?.trim() || contentElement.textContent?.trim() || '';
+                usedContentSelector += ' (fallback to text)';
             }
 
             // 清理内容：移除可能的按钮文本等噪音
@@ -367,12 +359,241 @@
         return title;
     }
 
-    // 生成 Markdown
+    // HTML 转 Markdown 的辅助函数
+    function htmlToMarkdown(element) {
+        if (!element) return '';
+
+        // 克隆元素以避免修改原始 DOM
+        const clone = element.cloneNode(true);
+
+        // 移除不需要的元素（按钮、工具栏等）
+        const removeSelectors = [
+            'button',
+            '[class*="copy"]',
+            '[class*="toolbar"]',
+            '[role="button"]',
+            '.sr-only'
+        ];
+        removeSelectors.forEach(selector => {
+            clone.querySelectorAll(selector).forEach(el => el.remove());
+        });
+
+        let markdown = '';
+
+        function processNode(node, listLevel = 0) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                return node.textContent;
+            }
+
+            if (node.nodeType !== Node.ELEMENT_NODE) {
+                return '';
+            }
+
+            const tag = node.tagName.toLowerCase();
+            let result = '';
+
+            switch (tag) {
+                case 'h1':
+                    result = '\n# ' + getTextContent(node) + '\n\n';
+                    break;
+                case 'h2':
+                    result = '\n## ' + getTextContent(node) + '\n\n';
+                    break;
+                case 'h3':
+                    result = '\n### ' + getTextContent(node) + '\n\n';
+                    break;
+                case 'h4':
+                    result = '\n#### ' + getTextContent(node) + '\n\n';
+                    break;
+                case 'h5':
+                    result = '\n##### ' + getTextContent(node) + '\n\n';
+                    break;
+                case 'h6':
+                    result = '\n###### ' + getTextContent(node) + '\n\n';
+                    break;
+                case 'p':
+                    result = processChildren(node, listLevel) + '\n\n';
+                    break;
+                case 'br':
+                    result = '\n';
+                    break;
+                case 'strong':
+                case 'b':
+                    result = '**' + getTextContent(node) + '**';
+                    break;
+                case 'em':
+                case 'i':
+                    result = '*' + getTextContent(node) + '*';
+                    break;
+                case 'code':
+                    // 行内代码
+                    if (node.parentElement.tagName.toLowerCase() !== 'pre') {
+                        result = '`' + getTextContent(node) + '`';
+                    } else {
+                        result = getTextContent(node);
+                    }
+                    break;
+                case 'pre':
+                    // 代码块
+                    const codeEl = node.querySelector('code');
+                    if (codeEl) {
+                        const language = extractLanguage(codeEl);
+                        const code = getTextContent(codeEl);
+                        result = '\n```' + language + '\n' + code + '\n```\n\n';
+                    } else {
+                        result = '\n```\n' + getTextContent(node) + '\n```\n\n';
+                    }
+                    break;
+                case 'a':
+                    const href = node.getAttribute('href') || '';
+                    const text = getTextContent(node);
+                    result = '[' + text + '](' + href + ')';
+                    break;
+                case 'ul':
+                case 'ol':
+                    result = '\n' + processListItems(node, tag === 'ol', listLevel) + '\n';
+                    break;
+                case 'li':
+                    // 由 processListItems 处理
+                    result = processChildren(node, listLevel);
+                    break;
+                case 'blockquote':
+                    const lines = processChildren(node, listLevel).split('\n');
+                    result = '\n' + lines.map(line => '> ' + line).join('\n') + '\n\n';
+                    break;
+                case 'hr':
+                    result = '\n---\n\n';
+                    break;
+                case 'table':
+                    result = processTable(node);
+                    break;
+                case 'img':
+                    const alt = node.getAttribute('alt') || '';
+                    const src = node.getAttribute('src') || '';
+                    result = '![' + alt + '](' + src + ')';
+                    break;
+                case 'div':
+                case 'span':
+                case 'article':
+                case 'section':
+                    result = processChildren(node, listLevel);
+                    break;
+                default:
+                    result = processChildren(node, listLevel);
+            }
+
+            return result;
+        }
+
+        function processChildren(node, listLevel = 0) {
+            let result = '';
+            for (const child of node.childNodes) {
+                result += processNode(child, listLevel);
+            }
+            return result;
+        }
+
+        function getTextContent(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                return node.textContent;
+            }
+            let text = '';
+            for (const child of node.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    text += child.textContent;
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                    const tag = child.tagName.toLowerCase();
+                    if (tag === 'strong' || tag === 'b') {
+                        text += '**' + getTextContent(child) + '**';
+                    } else if (tag === 'em' || tag === 'i') {
+                        text += '*' + getTextContent(child) + '*';
+                    } else if (tag === 'code' && child.parentElement.tagName.toLowerCase() !== 'pre') {
+                        text += '`' + getTextContent(child) + '`';
+                    } else {
+                        text += getTextContent(child);
+                    }
+                }
+            }
+            return text;
+        }
+
+        function processListItems(listNode, isOrdered, listLevel) {
+            let result = '';
+            let index = 1;
+            const items = Array.from(listNode.children).filter(child =>
+                child.tagName.toLowerCase() === 'li'
+            );
+
+            items.forEach(li => {
+                const indent = '  '.repeat(listLevel);
+                const marker = isOrdered ? `${index}. ` : '• ';
+                const content = processChildren(li, listLevel + 1).trim();
+
+                // 处理多行内容
+                const lines = content.split('\n');
+                result += indent + marker + lines[0] + '\n';
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim()) {
+                        result += indent + '  ' + lines[i] + '\n';
+                    }
+                }
+
+                index++;
+            });
+
+            return result;
+        }
+
+        function extractLanguage(codeElement) {
+            // 尝试从 class 中提取语言
+            const classes = codeElement.className.split(' ');
+            for (const cls of classes) {
+                if (cls.startsWith('language-')) {
+                    return cls.substring(9);
+                }
+                if (cls.startsWith('lang-')) {
+                    return cls.substring(5);
+                }
+            }
+            return '';
+        }
+
+        function processTable(tableNode) {
+            const rows = Array.from(tableNode.querySelectorAll('tr'));
+            if (rows.length === 0) return '';
+
+            let result = '\n';
+
+            rows.forEach((row, rowIndex) => {
+                const cells = Array.from(row.querySelectorAll('th, td'));
+                result += '| ' + cells.map(cell => getTextContent(cell).trim()).join(' | ') + ' |\n';
+
+                // 添加表头分隔符
+                if (rowIndex === 0) {
+                    result += '| ' + cells.map(() => '---').join(' | ') + ' |\n';
+                }
+            });
+
+            return result + '\n';
+        }
+
+        markdown = processNode(clone);
+
+        // 清理多余的空行
+        markdown = markdown.replace(/\n{3,}/g, '\n\n');
+
+        return markdown.trim();
+    }
+
+    // 生成 Markdown（符合 Kelivo 导入格式）
     function generateMarkdown(messages, title) {
         let markdown = `# ${title}\n\n`;
-        
-        messages.forEach(msg => {
-            markdown += `> ${msg.role}:\n${msg.content}\n\n`;
+
+        messages.forEach((msg, index) => {
+            const roleLabel = msg.role === 'user' ? '用户' : '助手';
+
+            // 使用 > 标记角色（Kelivo 导入格式要求）
+            markdown += `> ${roleLabel}\n\n${msg.content}\n\n`;
         });
 
         return markdown;

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>格式转换测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        #html-content {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+        #markdown-output {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+            background: #f9f9f9;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        button {
+            background: #10a37f;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        button:hover {
+            background: #0d8c6d;
+        }
+    </style>
+</head>
+<body>
+    <h1>ChatGPT 格式转换测试</h1>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>原始 HTML（模拟 ChatGPT 输出）</h2>
+            <button onclick="convertToMarkdown()">转换为 Markdown</button>
+            <div id="html-content">
+                <p>可以，但要讲清楚件事：</p>
+                <p><strong>（1）"更赚钱"的活动几乎都和平台自有玩法/平台币挂钩；</strong>回报更高、门槛/不确定性也更高。</p>
+                <p><strong>（2）150-300U 的小预算，适合批"低成本参与、能量化ROI"的活动</strong>，而不是去卷手续费很重的交易竞赛。</p>
+                
+                <h3>一句话建议（150-300U 档位）</h3>
+                
+                <ul>
+                    <li><strong>优先试：MEXC Kickstarter（投票空投）+ Bybit Launchpool / Airdrop Arcade（质押/任务空投）</strong>
+                        <br>这两类对小资金更友好：<strong>门槛清晰、成本可控</strong>，不用天天高频交易；但<strong>收益依活动而变，不保证</strong>。
+                    </li>
+                    <li><strong>次优选：KuCoin Spotlight（IEO/申购）</strong>
+                        <br>落在收益更"集中"，但通常要持<strong>KCS或按净资产规则参与</strong>，承受平台币价格波动。
+                    </li>
+                </ul>
+
+                <h3>代码示例</h3>
+                <pre><code class="language-python">def calculate_roi(investment, return_value):
+    """计算投资回报率"""
+    roi = (return_value - investment) / investment * 100
+    return f"{roi:.2f}%"
+
+# 示例
+print(calculate_roi(150, 200))  # 输出: 33.33%
+</code></pre>
+
+                <blockquote>
+                    <p><strong>风险提示：</strong>加密货币投资有风险，请谨慎参与。</p>
+                </blockquote>
+
+                <p>更多信息请访问 <a href="https://example.com">官方网站</a>。</p>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>转换后的 Markdown</h2>
+            <pre id="markdown-output">点击左侧的"转换为 Markdown"按钮查看结果</pre>
+        </div>
+    </div>
+
+    <script src="browser-extension/content.js"></script>
+    <script>
+        function convertToMarkdown() {
+            const htmlContent = document.getElementById('html-content');
+            const markdownOutput = document.getElementById('markdown-output');
+            
+            // 注意：这里需要从 content.js 中提取 htmlToMarkdown 函数
+            // 由于 content.js 是在闭包中，我们需要重新实现或导出该函数
+            
+            // 临时解决方案：显示说明
+            markdownOutput.textContent = `
+注意：由于 htmlToMarkdown 函数在 content.js 的闭包中，
+无法直接在此测试页面调用。
+
+要测试格式转换效果，请：
+1. 在 Chrome 中加载扩展
+2. 打开 ChatGPT 网页
+3. 导出一个对话
+4. 在 Kelivo 中查看效果
+
+或者，你可以在浏览器控制台中手动测试：
+1. 打开此页面的开发者工具
+2. 复制 content.js 中的 htmlToMarkdown 函数
+3. 在控制台中运行：
+   htmlToMarkdown(document.getElementById('html-content'))
+`;
+        }
+    </script>
+</body>
+</html>
+
