@@ -14,7 +14,11 @@
 
 ## 安装步骤
 
-### 1. 安装浏览器扩展
+### 1. 下载安装包
+
+首先从 [Releases](https://github.com/lyw123www/chatgpt-to-kelivo/releases/tag/v1.0.0) 下载最新版本的 `chatgpt-to-kelivo-v1.0.0.zip` 并解压。
+
+### 2. 安装浏览器扩展
 
 1. 打开 Chrome 浏览器，访问 `chrome://extensions/`
 2. 打开右上角的"开发者模式"
@@ -23,7 +27,7 @@
 5. 扩展安装完成
 6. 点击扩展图标，在弹出窗口中输入 Kelivo 的助手名字，点击保存设置
 
-### 2. 启动 Kelivo 导入服务器
+### 3. 启动 Kelivo 导入服务器
 
 双击运行 `kelivo_import_server.exe`
 
