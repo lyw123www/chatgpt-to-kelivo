@@ -1018,8 +1018,29 @@
         messages.forEach((msg, index) => {
             const roleLabel = msg.role === 'user' ? '用户' : '助手';
 
+            // 🔥 处理消息内容中的引用，避免与角色标记冲突
+            let content = msg.content;
+
+            // 将 Markdown 引用 (> text) 转换为缩进格式
+            // 使用 4 个空格缩进来表示引用内容
+            const lines = content.split('\n');
+            const processedLines = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.trim().startsWith('>')) {
+                    // 移除 > 符号，添加 4 个空格缩进
+                    const quotedText = line.replace(/^>\s*/, '');
+                    processedLines.push(`    ${quotedText}`);
+                } else {
+                    processedLines.push(line);
+                }
+            }
+
+            content = processedLines.join('\n');
+
             // 使用 > 标记角色（Kelivo 导入格式要求）
-            markdown += `> ${roleLabel}\n\n${msg.content}\n\n`;
+            markdown += `> ${roleLabel}\n\n${content}\n\n`;
         });
 
         return markdown;
