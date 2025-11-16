@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试滚动高度</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        
+        #info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #fff;
+            border: 2px solid #333;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 400px;
+        }
+        
+        #info h3 {
+            margin-top: 0;
+        }
+        
+        #info div {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+        }
+        
+        .log-info {
+            color: #2196F3;
+        }
+        
+        .log-success {
+            color: #4CAF50;
+        }
+        
+        .log-warning {
+            color: #FF9800;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>滚动信息</h3>
+        <div>滚动容器: <span id="container">-</span></div>
+        <div>scrollHeight: <span id="scrollHeight">-</span></div>
+        <div>clientHeight: <span id="clientHeight">-</span></div>
+        <div>scrollTop: <span id="scrollTop">-</span></div>
+        <div>window.innerHeight: <span id="innerHeight">-</span></div>
+        <div>document.body.scrollHeight: <span id="bodyScrollHeight">-</span></div>
+        <hr>
+        <button onclick="testScroll()">测试滚动</button>
+        <button onclick="scrollToBottom()">滚动到底部</button>
+        <button onclick="scrollToTop()">滚动到顶部</button>
+        <button onclick="clearLog()">清空日志</button>
+        <div id="log"></div>
+    </div>
+
+    <h1>在 ChatGPT 页面的控制台中运行此脚本</h1>
+    
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function updateInfo() {
+            // 查找滚动容器
+            const main = document.querySelector('main');
+            const scrollContainer = document.querySelector('[class*="scroll"]');
+            const scrollableElement = main || scrollContainer || document.documentElement;
+            
+            document.getElementById('container').textContent = scrollableElement.tagName;
+            document.getElementById('scrollHeight').textContent = scrollableElement.scrollHeight;
+            document.getElementById('clientHeight').textContent = scrollableElement.clientHeight;
+            document.getElementById('scrollTop').textContent = scrollableElement.scrollTop;
+            document.getElementById('innerHeight').textContent = window.innerHeight;
+            document.getElementById('bodyScrollHeight').textContent = document.body.scrollHeight;
+        }
+        
+        async function scrollToBottom() {
+            log('开始滚动到底部...', 'info');
+            
+            const scrollableElement = document.querySelector('main') ||
+                                     document.querySelector('[class*="scroll"]') ||
+                                     document.documentElement;
+            
+            for (let i = 0; i < 5; i++) {
+                const scrollHeight = scrollableElement.scrollHeight || document.body.scrollHeight;
+                log(`第 ${i + 1} 次滚动，当前高度: ${scrollHeight}`, 'info');
+                
+                if (scrollableElement === document.documentElement || scrollableElement === window) {
+                    window.scrollTo({
+                        top: scrollHeight,
+                        behavior: 'smooth'
+                    });
+                } else {
+                    scrollableElement.scrollTo({
+                        top: scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                updateInfo();
+                
+                const newScrollHeight = scrollableElement.scrollHeight || document.body.scrollHeight;
+                if (newScrollHeight > scrollHeight) {
+                    log(`检测到新内容: ${scrollHeight} -> ${newScrollHeight}`, 'success');
+                } else {
+                    log('没有新内容加载', 'warning');
+                    if (i >= 2) {
+                        log('连续 3 次没有新内容，停止', 'warning');
+                        break;
+                    }
+                }
+            }
+            
+            log('滚动到底部完成', 'success');
+        }
+        
+        async function scrollToTop() {
+            log('开始滚动到顶部...', 'info');
+            
+            const scrollableElement = document.querySelector('main') ||
+                                     document.querySelector('[class*="scroll"]') ||
+                                     document.documentElement;
+            
+            if (scrollableElement === document.documentElement || scrollableElement === window) {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            } else {
+                scrollableElement.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            updateInfo();
+            
+            log('滚动到顶部完成', 'success');
+        }
+        
+        async function testScroll() {
+            log('=== 开始测试滚动 ===', 'info');
+            updateInfo();
+            
+            await scrollToBottom();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            updateInfo();
+            
+            await scrollToTop();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            updateInfo();
+            
+            log('=== 测试完成 ===', 'success');
+        }
+        
+        // 定期更新信息
+        setInterval(updateInfo, 500);
+        
+        // 初始化
+        updateInfo();
+        log('页面加载完成，可以开始测试', 'success');
+    </script>
+</body>
+</html>
+

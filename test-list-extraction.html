@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试列表提取</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .test-content {
+            border: 2px solid #007bff;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>测试列表提取功能</h1>
+    
+    <button onclick="testExtraction()">测试提取</button>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>原始 HTML</h2>
+            <div class="test-content" id="testContent">
+                <h3>【6】小抄：一周怎么排【示例周程】</h3>
+                <ul>
+                    <li><strong>周一</strong>：OKX 做 1–2 个 <strong>≥10U</strong> 任务并验证；Binance 不交易（若无活动临近）。</li>
+                    <li><strong>周三</strong>：Alpha 买入 <strong>$16</strong> 一笔（≈4 分），检查"15 天内累计分"。</li>
+                    <li><strong>周四</strong>：cookie.fun 发 1 篇"方法论 + 截图"帖（可选）。</li>
+                    <li><strong>周五</strong>：若 5–7 天内有 Alpha 空投/TGE，开始"<strong>脉冲期</strong>"：每天做 <strong>$16 × 2</strong>（≈8 分/天）连续 3–5 天，力争跨过当场阈值（示例 100/60，仅作规则演示，以活动页为准）。</li>
+                    <li><strong>周日</strong>：revoke 授权、对账，计划下周。</li>
+                </ul>
+                
+                <h3>参考与核验（关键规则/费用/风险）</h3>
+                <ul>
+                    <li><strong>Binance Alpha</strong>：15 天滚动，$100 资产门槛触发有效计分、Volume 分额倍规则、两阶段阈值示例、参与即消耗积分。</li>
+                    <li><strong>OKX Cryptopedia / Unlock:TGE</strong>：任务金额门槛示例（交易≥10U/持仓≥10U 24h）、随机/不保证、反作弊条款。</li>
+                    <li><strong>cookie.fun</strong>：mindshare/Capital mindshare 机制与"高质量内容优先"。</li>
+                    <li><strong>费用与链上成本</strong>：Binance/OKX 费率页；Solana/Base/Arbitrum 官方费用机制。</li>
+                    <li><strong>平台/合规风险</strong>：OKX 2025 年 2 月在美认罪并罚款的新闻。</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>提取的 Markdown</h2>
+            <pre id="output"></pre>
+        </div>
+    </div>
+
+    <script>
+        // 复制 content.js 中的 htmlToMarkdown 函数
+        function htmlToMarkdown(element) {
+            if (!element) return '';
+
+            const clone = element.cloneNode(true);
+
+            const removeSelectors = [
+                'button',
+                '[class*="copy"]',
+                '[class*="toolbar"]',
+                '[role="button"]',
+                '.sr-only'
+            ];
+            removeSelectors.forEach(selector => {
+                clone.querySelectorAll(selector).forEach(el => el.remove());
+            });
+
+            let markdown = '';
+
+            function processNode(node, listLevel = 0) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent;
+                }
+
+                if (node.nodeType !== Node.ELEMENT_NODE) {
+                    return '';
+                }
+
+                const tag = node.tagName.toLowerCase();
+                let result = '';
+
+                switch (tag) {
+                    case 'h1':
+                        result = '\n# ' + getTextContent(node) + '\n\n';
+                        break;
+                    case 'h2':
+                        result = '\n## ' + getTextContent(node) + '\n\n';
+                        break;
+                    case 'h3':
+                        result = '\n### ' + getTextContent(node) + '\n\n';
+                        break;
+                    case 'h4':
+                        result = '\n#### ' + getTextContent(node) + '\n\n';
+                        break;
+                    case 'h5':
+                        result = '\n##### ' + getTextContent(node) + '\n\n';
+                        break;
+                    case 'h6':
+                        result = '\n###### ' + getTextContent(node) + '\n\n';
+                        break;
+                    case 'p':
+                        result = processChildren(node, listLevel) + '\n\n';
+                        break;
+                    case 'br':
+                        result = '\n';
+                        break;
+                    case 'strong':
+                    case 'b':
+                        result = '**' + getTextContent(node) + '**';
+                        break;
+                    case 'em':
+                    case 'i':
+                        result = '*' + getTextContent(node) + '*';
+                        break;
+                    case 'code':
+                        if (node.parentElement.tagName.toLowerCase() !== 'pre') {
+                            result = '`' + getTextContent(node) + '`';
+                        } else {
+                            result = getTextContent(node);
+                        }
+                        break;
+                    case 'pre':
+                        const codeEl = node.querySelector('code');
+                        if (codeEl) {
+                            const language = extractLanguage(codeEl);
+                            const code = getTextContent(codeEl);
+                            result = '\n```' + language + '\n' + code + '\n```\n\n';
+                        } else {
+                            result = '\n```\n' + getTextContent(node) + '\n```\n\n';
+                        }
+                        break;
+                    case 'a':
+                        const href = node.getAttribute('href') || '';
+                        const text = getTextContent(node);
+                        result = '[' + text + '](' + href + ')';
+                        break;
+                    case 'ul':
+                    case 'ol':
+                        result = '\n' + processListItems(node, tag === 'ol', listLevel) + '\n';
+                        break;
+                    case 'li':
+                        result = processChildren(node, listLevel);
+                        break;
+                    case 'blockquote':
+                        const quoteContent = processChildren(node, listLevel);
+                        result = '\n**引用：**\n' + quoteContent + '\n\n';
+                        break;
+                    case 'hr':
+                        result = '\n---\n\n';
+                        break;
+                    case 'table':
+                        result = processTable(node);
+                        break;
+                    case 'img':
+                        const alt = node.getAttribute('alt') || '';
+                        const src = node.getAttribute('src') || '';
+                        result = '![' + alt + '](' + src + ')';
+                        break;
+                    case 'div':
+                    case 'span':
+                    case 'article':
+                    case 'section':
+                        result = processChildren(node, listLevel);
+                        break;
+                    default:
+                        result = processChildren(node, listLevel);
+                }
+
+                return result;
+            }
+
+            function processChildren(node, listLevel = 0) {
+                let result = '';
+                for (const child of node.childNodes) {
+                    result += processNode(child, listLevel);
+                }
+                return result;
+            }
+
+            function getTextContent(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent;
+                }
+                let text = '';
+                for (const child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        text += child.textContent;
+                    } else if (child.nodeType === Node.ELEMENT_NODE) {
+                        const tag = child.tagName.toLowerCase();
+                        if (tag === 'strong' || tag === 'b') {
+                            text += '**' + getTextContent(child) + '**';
+                        } else if (tag === 'em' || tag === 'i') {
+                            text += '*' + getTextContent(child) + '*';
+                        } else if (tag === 'code' && child.parentElement.tagName.toLowerCase() !== 'pre') {
+                            text += '`' + getTextContent(child) + '`';
+                        } else {
+                            text += getTextContent(child);
+                        }
+                    }
+                }
+                return text;
+            }
+
+            function processListItems(listNode, isOrdered, listLevel) {
+                let result = '';
+                let index = 1;
+                const items = Array.from(listNode.children).filter(child =>
+                    child.tagName.toLowerCase() === 'li'
+                );
+
+                items.forEach(li => {
+                    const indent = '  '.repeat(listLevel);
+                    const marker = isOrdered ? `${index}. ` : '• ';
+                    const content = processChildren(li, listLevel + 1).trim();
+
+                    // 处理多行内容
+                    const lines = content.split('\n');
+                    result += indent + marker + lines[0] + '\n';
+                    for (let i = 1; i < lines.length; i++) {
+                        if (lines[i].trim()) {
+                            result += indent + '  ' + lines[i] + '\n';
+                        }
+                    }
+
+                    index++;
+                });
+
+                return result;
+            }
+
+            function extractLanguage(codeElement) {
+                const classes = codeElement.className.split(' ');
+                for (const cls of classes) {
+                    if (cls.startsWith('language-')) {
+                        return cls.substring(9);
+                    }
+                    if (cls.startsWith('lang-')) {
+                        return cls.substring(5);
+                    }
+                }
+                return '';
+            }
+
+            function processTable(tableNode) {
+                const rows = Array.from(tableNode.querySelectorAll('tr'));
+                if (rows.length === 0) return '';
+
+                let result = '\n';
+
+                rows.forEach((row, rowIndex) => {
+                    const cells = Array.from(row.querySelectorAll('th, td'));
+                    const cellContents = cells.map(cell => getTextContent(cell).trim());
+                    result += '| ' + cellContents.join(' | ') + ' |\n';
+
+                    if (rowIndex === 0) {
+                        result += '| ' + cells.map(() => '---').join(' | ') + ' |\n';
+                    }
+                });
+
+                result += '\n';
+                return result;
+            }
+
+            markdown = processNode(clone);
+            markdown = markdown.replace(/\n{3,}/g, '\n\n');
+            return markdown.trim();
+        }
+
+        function testExtraction() {
+            const testContent = document.getElementById('testContent');
+            const output = document.getElementById('output');
+
+            console.log('开始测试提取...');
+            console.log('原始 HTML:', testContent.innerHTML);
+
+            const markdown = htmlToMarkdown(testContent);
+
+            console.log('提取的 Markdown:', markdown);
+            output.textContent = markdown;
+        }
+    </script>
+</body>
+</html>
+
