@@ -96,18 +96,29 @@
 
 3. **选择导出的MD文件粘贴放入 ChatGPT 文件夹**
 
+---
+
+**以下内容会自动运行，你无需操作**：
+
 #### 第四步：自动导入和清理
 
 > ⚠️ **重要**：cherry-import.exe 会持续运行在后台
 
-**cherry-import.exe 的工作流程**：
+**以下内容会自动运行，你无需操作**：
 
-1. **持续监控 ChatGPT 文件夹**
+> 📌 **自动工作流程**（无需手动干预）
+>
+> 1. **持续监控 ChatGPT 文件夹**
+>    - cherry-import.exe 会一直在后台运行
+>    - 实时监控指定的 ChatGPT 文件夹
+>
+> 2. **自动导入 MD 文件**
+>    - 当新的 MD 文件放入 ChatGPT 文件夹时
+>    - cherry-import.exe 自动检测到
+>    - 自动导入到 Cherry Studio
+>
+> 3. **自动删除已导入的 MD 文件**
+>    - 导入完成后，cherry-import.exe 会自动删除该 MD 文件
+>    - 保持 ChatGPT 文件夹的整洁
 
-2. **自动导入 MD 文件**
-   - 当新的 MD 文件放入 ChatGPT 文件夹时,cherry-import.exe 自动检测到
-
-
-3. **自动删除已导入的 MD 文件**
-   - 导入完成后，cherry-import.exe 会自动删除该 MD 文件
 ![Cherry Studio 导入结果](images/image%20copy%203.png)
