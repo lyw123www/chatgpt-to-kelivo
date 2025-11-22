@@ -16,9 +16,25 @@
             </svg>
             <span>导出到 Kelivo</span>
         `;
-        
+
         button.onclick = handleExport;
         document.body.appendChild(button);
+
+        // 创建导出MD按钮
+        const mdButton = document.createElement('button');
+        mdButton.id = 'kelivo-export-md-btn';
+        mdButton.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="19" x2="12" y2="11"></line>
+                <polyline points="9 14 12 11 15 14"></polyline>
+            </svg>
+            <span>导出为 MD</span>
+        `;
+
+        mdButton.onclick = handleExportMD;
+        document.body.appendChild(mdButton);
     }
 
     // 🔥 最终修复版本：使用空间位置关系查找复制按钮
@@ -1109,8 +1125,9 @@
     }
 
     // 显示加载状态
-    function showLoading(show, message = '导出中...') {
-        const button = document.getElementById('kelivo-export-btn');
+    function showLoading(show, message = '导出中...', isMD = false) {
+        const buttonId = isMD ? 'kelivo-export-md-btn' : 'kelivo-export-btn';
+        const button = document.getElementById(buttonId);
         if (!button) return;
 
         if (show) {
@@ -1121,14 +1138,26 @@
             `;
         } else {
             button.disabled = false;
-            button.innerHTML = `
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                <span>导出到 Kelivo</span>
-            `;
+            if (isMD) {
+                button.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="12" y1="19" x2="12" y2="11"></line>
+                        <polyline points="9 14 12 11 15 14"></polyline>
+                    </svg>
+                    <span>导出为 MD</span>
+                `;
+            } else {
+                button.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>导出到 Kelivo</span>
+                `;
+            }
         }
     }
 
@@ -1254,6 +1283,99 @@
                 }
             });
         });
+    }
+
+    // 生成带有元数据的 Markdown（用于导出为 MD 文件）
+    function generateMarkdownWithMetadata(messages, title) {
+        // 生成唯一的 topicId
+        const now = new Date();
+        const timestamp = now.getTime();
+        const topicId = `topic_${timestamp}_${Math.random().toString(36).substring(2, 9)}`;
+
+        // 获取助手名称（从 popup 设置中获取，默认为"意图"）
+        const assistantName = '意图';
+
+        // 生成 YAML 前置元数据
+        const yamlMetadata = `---
+assistantName: ${assistantName}
+topicId: ${topicId}
+topicName: ${title}
+---`;
+
+        // 生成对话内容
+        let markdown = yamlMetadata + '\n';
+
+        messages.forEach((msg, index) => {
+            const roleLabel = msg.role === 'user' ? '🧑‍💻 User' : '🤖 Assistant';
+
+            // 处理消息内容中的引用
+            let content = msg.content;
+            const lines = content.split('\n');
+            const processedLines = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.trim().startsWith('>')) {
+                    const quotedText = line.replace(/^>\s*/, '');
+                    processedLines.push(`    ${quotedText}`);
+                } else {
+                    processedLines.push(line);
+                }
+            }
+
+            content = processedLines.join('\n');
+
+            // 使用 ## 标记角色
+            markdown += `\n## ${roleLabel}\n\n${content}\n`;
+        });
+
+        return markdown;
+    }
+
+    // 处理导出为 MD
+    async function handleExportMD() {
+        try {
+            showLoading(true, '准备导出...', true);
+
+            // 提取对话（带进度回调）
+            const messages = await extractConversation((progress) => {
+                showLoading(true, progress, true);
+            });
+
+            if (messages.length === 0) {
+                throw new Error('未找到对话内容');
+            }
+
+            console.log(`准备导出 ${messages.length} 条消息为 MD`);
+            showLoading(true, '生成 Markdown...', true);
+
+            // 获取标题
+            const title = getConversationTitle();
+
+            // 生成带元数据的 Markdown
+            const markdown = generateMarkdownWithMetadata(messages, title);
+
+            showLoading(true, '下载文件...', true);
+
+            // 创建 Blob 并下载
+            const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${title}_${new Date().getTime()}.md`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showLoading(false, '导出中...', true);
+            showNotification(`✅ 成功导出 ${messages.length} 条消息为 MD 文件！`, 'success');
+
+        } catch (error) {
+            showLoading(false, '导出中...', true);
+            console.error('导出 MD 错误:', error);
+            showNotification(`❌ 导出失败: ${error.message}`, 'error');
+        }
     }
 
     // 处理导出
