@@ -8,7 +8,7 @@
 
 ### 1. 下载安装包
 
-从 [Releases](https://github.com/lyw123www/chatgpt-to-kelivo/releases/tag/v1.1.2) 下载最新版本并解压。
+从 [Releases](https://github.com/lyw123www/chatgpt-to-kelivo/releases/tag/v3) 下载最新版本并解压。
 
 ### 2. 安装浏览器扩展
 
