@@ -25,8 +25,12 @@
         "https://chatgpt.com/*",
         "https://chat.openai.com/*"
       ],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -42,6 +46,6 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsaIMH+UeoJ79D8AWm2ma38fgSAOdmRvTxApwp5c5fi2hvVK1A/El/MH05VHXfsk/vHp8csaLnwuwtlc7UtvMcb+2WMJTChWv4XQxTrPUIvCHWZL7iN4gy8L7bZFHxww3AaT/vZboPhNRZ1N4Y8EhSJwzztmTGKhshNHYTVFPfR1Ci/9Ia8OOk4WfztryPbH44RV3SkeJxdZVD4OQo9tZpg6Whs7z2D1wUj1/F9nT6sM6Xv2ZOPhD5g29LFJxnOF+a9UmtjAqauP7tLfTjfZKSaoa5ilgyZJxZy2Q0RJw1xGFOEdcdobnjG/7LULevrPyxyVH4HeIiVK0RHZGk4xYwQIDAQAB"
 }
-
