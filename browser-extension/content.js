@@ -520,23 +520,179 @@
         });
     }
 
-    // 提取对话内容
-    async function extractConversation(progressCallback) {
-        // 🔥 只使用复制按钮方法获取 Markdown 格式内容
-        if (progressCallback) progressCallback('通过复制按钮获取 Markdown 格式内容...');
+    // =============================
+    // 优化方案：优先通过后端接口一次性获取对话（更快、更稳定）
+    // =============================
 
-        console.log('🔥 使用复制按钮方法获取 Markdown 格式内容');
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
-        const copyMessages = await extractByClickingCopyButtons();
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
 
-        if (copyMessages && copyMessages.length > 0) {
-            console.log(`✅ 成功通过复制按钮获取 ${copyMessages.length} 条消息`);
-            return copyMessages;
+    function getConversationIdFromUrl() {
+        const match = window.location.pathname.match(/\/c\/([a-zA-Z0-9-]+)/);
+        return match ? match[1] : null;
+    }
+
+    async function getAccessTokenFromSession() {
+        const response = await fetchWithTimeout('/api/auth/session', {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Accept': 'application/json' }
+        }, 15000);
+
+        if (!response.ok) {
+            throw new Error(`session 获取失败 (${response.status})`);
         }
 
-        console.log('❌ 复制按钮方法失败，无法获取内容');
-        throw new Error('无法通过复制按钮获取内容，请确保页面已完全加载');
+        const data = await response.json();
+        const token =
+            data?.accessToken ||
+            data?.access_token ||
+            data?.token?.accessToken ||
+            data?.token?.access_token;
 
+        if (!token) {
+            throw new Error('未获取到 access token（可能未登录或会话过期）');
+        }
+
+        return token;
+    }
+
+    function normalizeBackendPart(part) {
+        if (typeof part === 'string') return part;
+        if (!part || typeof part !== 'object') return '';
+        if (typeof part.text === 'string') return part.text;
+        if (typeof part.content === 'string') return part.content;
+        if (typeof part.caption === 'string') return part.caption;
+        return '';
+    }
+
+    function extractMessageContentFromBackend(message) {
+        const content = message?.content;
+        let text = '';
+
+        if (content) {
+            const parts = content.parts;
+            if (Array.isArray(parts)) {
+                text = parts.map(normalizeBackendPart).filter(Boolean).join('\n');
+            } else if (typeof content.text === 'string') {
+                text = content.text;
+            } else if (typeof content === 'string') {
+                text = content;
+            }
+        }
+
+        // 图片/附件：尽量给出占位（复制按钮方案往往会在这里失败）
+        const attachments = message?.metadata?.attachments;
+        if (Array.isArray(attachments) && attachments.length > 0) {
+            const lines = attachments.map(att => {
+                const name = att?.name || att?.filename || att?.file_name || 'attachment';
+                const mime = att?.mime_type || att?.mimeType || '';
+
+                if (typeof mime === 'string' && mime.startsWith('image/')) {
+                    return `![${name}](attachment:${name})`;
+                }
+                return `[附件: ${name}]`;
+            });
+
+            const attachmentText = lines.join('\n');
+            text = text ? `${text}\n\n${attachmentText}` : attachmentText;
+        }
+
+        return (text || '').trim();
+    }
+
+    function buildMessagesFromConversationData(conversationData) {
+        if (!conversationData || !conversationData.mapping || !conversationData.current_node) {
+            return null;
+        }
+
+        const mapping = conversationData.mapping;
+        const orderedMessages = [];
+        let nodeId = conversationData.current_node;
+
+        // 沿着 current_node -> parent 回溯，得到当前分支的消息链
+        while (nodeId) {
+            const node = mapping[nodeId];
+            if (!node) break;
+            if (node.message) orderedMessages.push(node.message);
+            nodeId = node.parent;
+        }
+
+        orderedMessages.reverse();
+
+        const messages = [];
+        for (const msg of orderedMessages) {
+            const role = msg?.author?.role;
+            if (role !== 'user' && role !== 'assistant') continue;
+
+            const text = extractMessageContentFromBackend(msg);
+            if (text) messages.push({ role, content: text });
+        }
+
+        return messages;
+    }
+
+    async function extractConversationViaBackendApi(progressCallback) {
+        const conversationId = getConversationIdFromUrl();
+        if (!conversationId) {
+            throw new Error('未从 URL 解析到对话 ID（需要在 /c/<id> 页面）');
+        }
+
+        if (progressCallback) progressCallback('获取登录令牌...');
+        const token = await getAccessTokenFromSession();
+
+        if (progressCallback) progressCallback('通过接口拉取对话数据...');
+
+        const url = `/backend-api/conversation/${conversationId}`;
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const response = await fetchWithTimeout(url, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                }, 20000);
+
+                if (!response.ok) {
+                    throw new Error(`对话接口请求失败 (${response.status})`);
+                }
+
+                const data = await response.json();
+                const messages = buildMessagesFromConversationData(data);
+
+                if (messages && messages.length > 0) {
+                    console.log(`✅ 后端接口获取成功：${messages.length} 条消息`);
+                    return messages;
+                }
+
+                throw new Error('对话接口返回为空或结构不兼容');
+            } catch (e) {
+                lastError = e;
+                console.warn(`后端接口抓取失败（第 ${attempt} 次）:`, e?.message || e);
+                await sleep(500 * attempt);
+            }
+        }
+
+        throw lastError || new Error('后端接口抓取失败');
+    }
+
+    // DOM 解析：不点复制按钮，直接把渲染后的 HTML 转 Markdown（作为回退方案）
+    async function extractConversationViaDom(progressCallback) {
         const messages = [];
 
         // ChatGPT 消息选择器（根据实际页面结构调整）
@@ -711,6 +867,46 @@
         console.log(`成功提取 ${messages.length} 条消息`);
         console.log('消息详情:', messages.map((m, i) => `${i + 1}. [${m.role}] ${m.content.substring(0, 30)}...`));
         return messages;
+    }
+
+    // 提取对话内容
+    async function extractConversation(progressCallback) {
+        // 1) 优先：后端接口一次性抓取（无需逐条点复制按钮）
+        try {
+            if (progressCallback) progressCallback('通过接口快速获取对话数据...');
+            const apiMessages = await extractConversationViaBackendApi(progressCallback);
+            if (apiMessages && apiMessages.length > 0) {
+                return apiMessages;
+            }
+        } catch (e) {
+            console.warn('后端接口获取失败，回退到页面解析:', e?.message || e);
+        }
+
+        // 2) DOM 解析：直接解析页面渲染内容（不依赖剪贴板）
+        try {
+            if (progressCallback) progressCallback('解析页面内容...');
+            expandAllCollapsedContent();
+            await waitForMessagesRendered();
+            const domMessages = await extractConversationViaDom(progressCallback);
+            if (domMessages && domMessages.length > 0) {
+                return domMessages;
+            }
+        } catch (e) {
+            console.warn('页面解析失败，回退到复制按钮兼容模式:', e?.message || e);
+        }
+
+        // 3) 复制按钮兼容模式：最慢且易受页面状态影响
+        if (progressCallback) progressCallback('通过复制按钮获取内容（兼容模式）...');
+        console.log('🔥 使用复制按钮方法获取 Markdown 格式内容');
+
+        const copyMessages = await extractByClickingCopyButtons();
+        if (copyMessages && copyMessages.length > 0) {
+            console.log(`✅ 成功通过复制按钮获取 ${copyMessages.length} 条消息`);
+            return copyMessages;
+        }
+
+        console.log('❌ 复制按钮方法失败，无法获取内容');
+        throw new Error('无法通过复制按钮获取内容，请确保页面已完全加载');
     }
 
     // 获取对话标题
